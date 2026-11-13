@@ -283,7 +283,7 @@ function buildMultilingualSearchForms(text) {
     .replace(/['’ʼ`ьъ]/g, '');
 
   // Expand known UA/RU/EN name synonyms (e.g., Олена <-> Елена <-> Olena <-> Elena)
-  const tokens = raw.split(/[^a-zа-яіїєґё0-9]+/).filter(Boolean);
+  const tokens = raw.split(/[^a-z\u0400-\u04ff0-9]+/i).filter(Boolean);
   const synonymExpansion = [];
   for (const tok of tokens) {
     for (const group of NAME_SYNONYM_GROUPS) {
@@ -296,10 +296,10 @@ function buildMultilingualSearchForms(text) {
 
   // Transliterate Cyrillic (UA & RU) -> Latin so searching Latin or Cyrillic matches either way
   const cyrToLatMap = {
-    а: 'a', б: 'b', в: 'v', г: 'g', ґ: 'g', д: 'd', е: 'e', ё: 'e', є: 'ye',
-    ж: 'zh', з: 'z', и: 'y', і: 'i', ї: 'yi', й: 'y', к: 'k', л: 'l', м: 'm',
-    н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh',
-    ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya'
+    "а": 'a', "б": 'b', "в": 'v', "г": 'g', "ґ": 'g', "д": 'd', "е": 'e', "ё": 'e', "є": 'ye',
+    "ж": 'zh', "з": 'z', "и": 'y', "і": 'i', "ї": 'yi', "й": 'y', "к": 'k', "л": 'l', "м": 'm',
+    "н": 'n', "о": 'o', "п": 'p', "р": 'r', "с": 's', "т": 't', "у": 'u', "ф": 'f', "х": 'kh',
+    "ц": 'ts', "ч": 'ch', "ш": 'sh', "щ": 'shch', "ъ": '', "ы": 'y', "ь": '', "э": 'e', "ю": 'yu', "я": 'ya'
   };
   let lat = '';
   for (const ch of expandedRaw) {
@@ -1521,14 +1521,53 @@ function renderEveningCarouselModal() {
             <p style="font-size:13px;color:#64748b;">Увімкніть «🔥 Режим Вогню» або натисніть кнопку торкання в картці клієнта.</p>
           </div>
         ` : `
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px;color:#64748b;font-weight:700;">Картка ${state.carouselIndex + 1} з ${touchedLeads.length}</div>
-            <h3 style="font-size:19px;font-weight:800;margin-top:4px;">#${current.shortId} ${escapeHtml(current.clientName)}</h3>
-            <p style="font-size:13px;color:#334155;margin-top:4px;">
-              ✈️ ${escapeHtml(current.departureCity)} → ${escapeHtml(current.destination)} • 💶 €${formatMoney(current.budgetEUR)}
-            </p>
+                    <div style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-size:12px;color:#64748b;font-weight:700;">Картка ${state.carouselIndex + 1} з ${touchedLeads.length}</div>
+            </div>
+
+            <!-- Компактна інформаційна плашка туриста (Експрес-контекст) -->
+            <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin:8px 0 14px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+              <!-- Рядок 1: Ім'я, телефон і бейдж поточного етапу -->
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:17px;font-weight:800;color:#0f172a;">#${current.shortId} ${escapeHtml(current.clientName)}</span>
+                  ${current.phone ? `<a href="tel:${escapeHtml(current.phone)}" style="font-size:12px;color:#2563eb;text-decoration:none;font-weight:700;">📞 ${escapeHtml(current.phone)}</a>` : ''}
+                </div>
+                <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;">
+                  📍 Зараз: ${STAGES.find(s => s.id === current.stage)?.title || current.stage}
+                </span>
+              </div>
+              <!-- Рядок 2: Ключові параметри поїздки (чіпи) -->
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;font-size:12px;">
+                <span style="background:#f8fafc;border:1px solid #cbd5e1;padding:3px 8px;border-radius:6px;color:#334155;">
+                  ✈️ <strong>${escapeHtml(current.departureCity || 'Місто не вказано')}</strong> → <strong>${escapeHtml(current.destination || 'Будь-куди')}</strong>
+                </span>
+                ${current.budgetEUR ? `
+                  <span style="background:#ecfdf5;border:1px solid #a7f3d0;padding:3px 8px;border-radius:6px;color:#065f46;font-weight:800;">
+                    💶 €${formatMoney(current.budgetEUR)}
+                  </span>
+                ` : ''}
+                ${(current.peopleCount || current.tourists) ? `
+                  <span style="background:#f8fafc;border:1px solid #cbd5e1;padding:3px 8px;border-radius:6px;color:#334155;">
+                    👥 ${escapeHtml(current.peopleCount || current.tourists)}
+                  </span>
+                ` : ''}
+                ${current.hotelName ? `
+                  <span style="background:#eff6ff;border:1px solid #bfdbfe;padding:3px 8px;border-radius:6px;color:#1e40af;font-weight:700;">
+                    🏨 ${escapeHtml(current.hotelName)}
+                  </span>
+                ` : ''}
+              </div>
+              <!-- Рядок 3: Запит / Поточна ситуація (контекст туриста) -->
+              ${(current.currentSituation || current.wishes) ? `
+                <div style="background:#f8fafc;border-left:3px solid #153629;padding:7px 10px;border-radius:4px;font-size:12px;color:#334155;line-height:1.45;max-height:85px;overflow-y:auto;">
+                  <strong style="color:#153629;">Запит / Ситуація:</strong> ${escapeHtml(current.currentSituation || current.wishes)}
+                </div>
+              ` : ''}
+            </div>
             <div style="margin-top:10px;">
-              <label style="font-size:11.5px;font-weight:800;color:#153629;display:block;margin-bottom:5px;">
+<label style="font-size:11.5px;font-weight:800;color:#153629;display:block;margin-bottom:5px;">
                 📝 Новий коментар / Підсумок дня по клієнту (додається в переписку та анкету):
               </label>
               <div style="display:flex;gap:7px;">
