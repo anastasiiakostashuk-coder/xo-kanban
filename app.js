@@ -656,6 +656,22 @@ function renderCard(lead) {
         <span class="badge-budget">${budgetText}</span>
       </div>
 
+
+      <!-- Кнопка створення / переходу до підбірки туриста (в 1 клік) -->
+      ${['new_request', 'clarifying', 'in_progress', 'waiting_decision', 'combination', 'booked'].includes(lead.stage) ? `
+        <div style="margin-top:5px;" onclick="event.stopPropagation()">
+          <a
+            href="/selection-preview.html?leadId=${lead.id}&client=${encodeURIComponent(lead.clientName)}&dest=${encodeURIComponent(lead.destination||'')}&city=${encodeURIComponent(lead.departureCity||'')}"
+            target="_blank"
+            rel="noopener"
+            style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:5px 8px;font-size:11px;font-weight:800;background:linear-gradient(135deg, #059669 0%, #047857 100%);color:#ffffff;border-radius:6px;text-decoration:none;box-shadow:0 2px 6px rgba(5,150,105,0.25);transition:all 0.15s ease;"
+            title="Створити та надіслати підбірку турів туристу"
+          >
+            🌴 Створити підбірку ↗
+          </a>
+        </div>
+      ` : ''}
+
       <!-- ШВИДКА ЗМІНА СТАТУСУ ПРЯМО НА КАРТЦІ КАНБАНУ (В БУДЬ-ЯКИЙ БІК) -->
       <div style="margin-top:2px;" onclick="event.stopPropagation()">
         <select
