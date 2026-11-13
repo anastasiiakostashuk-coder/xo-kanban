@@ -422,6 +422,10 @@ function renderHeader() {
           💾 Бекап .db
         </a>
 
+        <a href="/selection-preview.html" target="_blank" rel="noopener" class="xo-btn" style="background:#059669;color:#ffffff;text-decoration:none;font-weight:800;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(5,150,105,0.35);">
+          🌴 Створити підбірку ↗
+        </a>
+
         <button class="xo-btn xo-btn-lime" onclick="window.openNewLeadModal()">
           + Новий лід
         </button>
@@ -887,6 +891,9 @@ function renderLeadDrawer() {
               <span class="meta-pill">🛫 Виліт: ${escapeHtml(lead.departureCity)}</span>
               <span class="meta-pill">💶 €${formatMoney(lead.budgetEUR)} (${formatMoney(lead.budgetUAH)} ₴)</span>
               <span class="meta-pill">👨‍👩‍👧 Сім'я: ${escapeHtml(lead.familyComposition)}</span>
+              <a href="/selection-preview.html?leadId=${lead.id}&client=${encodeURIComponent(lead.clientName)}&dest=${encodeURIComponent(lead.destination||'')}&city=${encodeURIComponent(lead.departureCity||'')}" target="_blank" rel="noopener" class="meta-pill" style="background:#059669;color:#ffffff;font-weight:800;text-decoration:none;box-shadow:0 2px 6px rgba(5,150,105,0.3);">
+                🌴 Створити підбірку під туриста ↗
+              </a>
             </div>
           </div>
           <button class="xo-btn" style="background:#f1f5f9;color:#0f172a;" onclick="window.closeLead()">✕ Закрити</button>
