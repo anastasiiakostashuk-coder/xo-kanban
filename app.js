@@ -2749,7 +2749,61 @@ window.closeEveningCarousel = () => {
   render();
 };
 
+
+// --- Автоматичний тригер «🏁 Завершення робочого дня» ---
+function hasFinishedDayToday() {
+  const d = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+  const curUser = state.currentUser || 'tetiana';
+  const roleMap = { tetiana: 'm1', rita: 'm2', anastasiia: 'director' };
+  const r = roleMap[curUser] || 'm1';
+  
+  // Check if daily report already saved in global state
+  const reports = (window.state && window.state.dailyReports) || [];
+  return reports.some(rep => (rep.author === r || rep.author === curUser) && rep.date === d);
+}
+
+function triggerAutoFinishDayModal(reason = 'carousel_end') {
+  if (hasFinishedDayToday()) return;
+
+  // UX Guard: check if dismissed within last 60 minutes
+  const lastDismissed = sessionStorage.getItem('dismissed_finish_day');
+  if (lastDismissed && (Date.now() - Number(lastDismissed)) < 60 * 60 * 1000) {
+    return;
+  }
+
+  // If time-trigger, only fire after 18:30 Kyiv time
+  if (reason === 'time_check') {
+    const nowKyiv = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }));
+    const minutesSinceMidnight = nowKyiv.getHours() * 60 + nowKyiv.getMinutes();
+    if (minutesSinceMidnight < (18 * 60 + 30)) {
+      return;
+    }
+  }
+
+  if (typeof window.openFinishDayModal === 'function') {
+    setTimeout(() => {
+      window.openFinishDayModal(reason === 'carousel_end');
+    }, 400);
+  } else if (typeof window.parent?.openFinishDayModal === 'function') {
+    setTimeout(() => {
+      window.parent.openFinishDayModal(reason === 'carousel_end');
+    }, 400);
+  }
+}
+
+// Evening time-trigger listener on manager activity after 18:30
+document.addEventListener('click', () => {
+  triggerAutoFinishDayModal('time_check');
+}, { passive: true });
+
 window.stepCarousel = (dir) => {
+  const touchedLeads = state.leads.filter(l => l.touchedToday);
+  if (dir > 0 && state.carouselIndex >= touchedLeads.length - 1) {
+    // Reached the end of carousel!
+    window.closeEveningCarousel();
+    triggerAutoFinishDayModal('carousel_end');
+    return;
+  }
   state.carouselIndex = Math.max(0, state.carouselIndex + dir);
   render();
 };
@@ -2795,8 +2849,15 @@ window.carouselMoveStage = async (leadId, newStage) => {
     lostReason = prompted;
   }
   const touchedLeads = state.leads.filter(l => l.touchedToday);
-  if (state.carouselIndex < touchedLeads.length - 1) {
+  const isLastLead = state.carouselIndex >= touchedLeads.length - 1;
+  if (!isLastLead) {
     state.carouselIndex += 1;
+  } else {
+    // Processed the last lead!
+    setTimeout(() => {
+      window.closeEveningCarousel();
+      triggerAutoFinishDayModal('carousel_end');
+    }, 500);
   }
   if (comment && comment !== (lead?.currentSituation || '')) {
     await apiCall('/api/leads/touch', 'POST', {
