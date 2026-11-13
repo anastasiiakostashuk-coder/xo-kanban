@@ -2771,11 +2771,11 @@ function triggerAutoFinishDayModal(reason = 'carousel_end') {
     return;
   }
 
-  // If time-trigger, only fire after 18:30 Kyiv time
+  // If time-trigger, only fire after 21:00 Kyiv time
   if (reason === 'time_check') {
     const nowKyiv = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }));
     const minutesSinceMidnight = nowKyiv.getHours() * 60 + nowKyiv.getMinutes();
-    if (minutesSinceMidnight < (18 * 60 + 30)) {
+    if (minutesSinceMidnight < (21 * 60)) {
       return;
     }
   }
