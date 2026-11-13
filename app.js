@@ -422,9 +422,7 @@ function renderHeader() {
           💾 Бекап .db
         </a>
 
-        <a href="/selection-preview.html" target="_blank" rel="noopener" class="xo-btn" style="background:#059669;color:#ffffff;text-decoration:none;font-weight:800;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(5,150,105,0.35);">
-          🌴 Створити підбірку ↗
-        </a>
+
 
         <button class="xo-btn xo-btn-lime" onclick="window.openNewLeadModal()">
           + Новий лід
@@ -655,21 +653,28 @@ function renderCard(lead) {
         </div>
         <span class="badge-budget">${budgetText}</span>
       </div>
-
-
-      <!-- Кнопка створення / переходу до підбірки туриста (в 1 клік) -->
-      ${['new_request', 'clarifying', 'in_progress', 'waiting_decision', 'combination', 'booked'].includes(lead.stage) ? `
-        <div style="margin-top:5px;" onclick="event.stopPropagation()">
-          <button
-            type="button"
-            onclick="window.openSelectionModalForLead('${lead.id}')"
-            style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:5px 8px;font-size:11px;font-weight:800;background:linear-gradient(135deg, #059669 0%, #047857 100%);color:#ffffff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 6px rgba(5,150,105,0.25);transition:all 0.15s ease;"
-            title="Вставити посилання Турсканера та сформувати підбірку"
-          >
-            🌴 ${lead.selectionHotels && lead.selectionHotels.length ? '🌴 Добірка (' + lead.selectionHotels.length + ' гот.) ⚙️' : '🌴 Створити підбірку (вставити Tourscanner)'}
-          </button>
+      ${(lead.selections && lead.selections.length) ? `
+        <div style="margin-top:4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+          <span style="font-size:10.5px;font-weight:800;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;padding:2px 6px;border-radius:5px;">
+            🌴 Підбірок: ${lead.selections.length}
+          </span>
+          ${lead.selections.slice(0, 3).map((s, i) => `
+            <a
+              href="${s.url || `/p/${lead.id}?sel=${s.id}`}"
+              target="_blank"
+              rel="noopener"
+              style="font-size:10.5px;font-weight:700;color:#0284c7;text-decoration:none;background:#f0f9ff;border:1px solid #bae6fd;padding:2px 6px;border-radius:5px;"
+              title="${escapeHtml(s.title || 'Підбірка')} (${(s.hotels||[]).length} гот.)"
+            >
+              №${i+1} ↗
+            </a>
+          `).join('')}
         </div>
       ` : ''}
+
+
+
+
 
       <!-- ШВИДКА ЗМІНА СТАТУСУ ПРЯМО НА КАРТЦІ КАНБАНУ (В БУДЬ-ЯКИЙ БІК) -->
       <div style="margin-top:2px;" onclick="event.stopPropagation()">
@@ -906,9 +911,7 @@ function renderLeadDrawer() {
               <span class="meta-pill">🛫 Виліт: ${escapeHtml(lead.departureCity)}</span>
               <span class="meta-pill">💶 €${formatMoney(lead.budgetEUR)} (${formatMoney(lead.budgetUAH)} ₴)</span>
               <span class="meta-pill">👨‍👩‍👧 Сім'я: ${escapeHtml(lead.familyComposition)}</span>
-              <a href="/selection-preview.html?leadId=${lead.id}&client=${encodeURIComponent(lead.clientName)}&dest=${encodeURIComponent(lead.destination||'')}&city=${encodeURIComponent(lead.departureCity||'')}" target="_blank" rel="noopener" class="meta-pill" style="background:#059669;color:#ffffff;font-weight:800;text-decoration:none;box-shadow:0 2px 6px rgba(5,150,105,0.3);">
-                🌴 Створити підбірку під туриста ↗
-              </a>
+
             </div>
           </div>
           <button class="xo-btn" style="background:#f1f5f9;color:#0f172a;" onclick="window.closeLead()">✕ Закрити</button>
@@ -971,6 +974,74 @@ function renderLeadDrawer() {
             ` : ''}
           </div>
         </div>
+
+        
+        <!-- 🌴 СЕКЦІЯ ПІДБІРОК ТУРИСТА (ЗБЕРЕЖЕННЯ ВСІХ ВАРІАНТІВ І СТВОРЕННЯ НОВИХ) -->
+        <div class="drawer-selections-box" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(16,185,129,0.08);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">🌴</span>
+              <strong style="font-size:13.5px;color:#166534;">Підбірки турів для клієнта (${(lead.selections || []).length})</strong>
+            </div>
+            <button
+              type="button"
+              class="xo-btn xo-btn-lime"
+              style="font-size:12px;font-weight:800;padding:6px 14px;border-radius:8px;background:#059669;color:#fff;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;box-shadow:0 2px 6px rgba(5,150,105,0.3);"
+              onclick="window.openSelectionModalForLead('${lead.id}')"
+            >
+              <span>+ Створити нову підбірку</span>
+            </button>
+          </div>
+
+          <!-- Список усіх збережених підбірок цього туриста -->
+          ${(lead.selections && lead.selections.length > 0) ? `
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${lead.selections.map((sel, sIdx) => {
+                const selUrl = window.location.origin + `/p/${lead.id}?sel=${sel.id || 'sel_' + (sIdx+1)}`;
+                return `
+                  <div style="display:flex;align-items:center;justify-content:space-between;background:#ffffff;border:1px solid #bbf7d0;padding:10px 12px;border-radius:9px;gap:10px;flex-wrap:wrap;">
+                    <div>
+                      <div style="font-weight:800;font-size:13px;color:#0f172a;display:flex;align-items:center;gap:6px;">
+                        <span>📑 ${escapeHtml(sel.title || `Підбірка #${sIdx + 1}`)}</span>
+                        <span style="font-size:11px;font-weight:700;color:#059669;background:#ecfdf5;padding:1px 6px;border-radius:4px;">
+                          ${(sel.hotels || []).length} гот.
+                        </span>
+                        ${sel.createdAt ? `<span style="font-size:10.5px;color:#94a3b8;font-weight:500;">· ${new Date(sel.createdAt).toLocaleDateString('uk-UA')}</span>` : ''}
+                      </div>
+                      <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                        ${escapeHtml(sel.destination || lead.destination || '')} · ${escapeHtml(sel.tourists || lead.tourists || '2 дор.')}
+                      </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <a
+                        href="${selUrl}"
+                        target="_blank"
+                        rel="noopener"
+                        style="font-size:11.5px;font-weight:800;color:#0284c7;background:#f0f9ff;border:1px solid #bae6fd;padding:5px 10px;border-radius:6px;text-decoration:none;"
+                        title="Відкрити інтерактивний батл та свайпи туриста"
+                      >
+                        👁️ Відкрити ↗
+                      </a>
+                      <button
+                        type="button"
+                        style="font-size:11.5px;font-weight:800;color:#065f46;background:#ecfdf5;border:1px solid #a7f3d0;padding:5px 10px;border-radius:6px;cursor:pointer;"
+                        onclick="navigator.clipboard.writeText('${selUrl}');alert('✅ Скопійовано посилання на ${escapeHtml(sel.title || `Підбірку #${sIdx + 1}`)}:\n' + '${selUrl}');"
+                        title="Скопіювати посилання для відправки в месенджер"
+                      >
+                        📋 Скопіювати
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          ` : `
+            <div style="font-size:12px;color:#15803d;background:rgba(255,255,255,0.7);padding:10px 12px;border-radius:8px;border:1px dashed #86efac;text-align:center;">
+              Поки що немає створених підбірок. Натисніть «<strong>+ Створити нову підбірку</strong>», щоб розпізнати посилання з Турсканера.
+            </div>
+          `}
+        </div>
+
 
         <!-- 3-SECOND 1-CLICK LOGGER (ТАНЯ / РИТА / АНАСТАСІЯ) -->
         <div class="tanya-logger-box">
@@ -2989,19 +3060,33 @@ window.parseTourLinkForLead = async (leadId) => {
 
     const lead = state.leads.find(l => l.id === leadId);
     if (lead) {
-      lead.selectionHotels = data.hotels || [];
-      lead.selectionTourists = data.tourists || lead.tourists || '2 дорослих';
-      lead.selectionDestination = data.destination || lead.destination || '';
-      lead.selectionOrigin = data.departureOrigin || lead.departureCity || '';
-      lead.selectionUrl = `/p/${lead.id}`;
+      lead.selections = lead.selections || [];
+      const newSelIndex = lead.selections.length + 1;
+      const newSelectionItem = {
+        id: 'sel_' + Date.now(),
+        title: (data.destination ? `Підбірка #${newSelIndex} (${data.destination})` : `Підбірка #${newSelIndex}`),
+        tourists: data.tourists || lead.tourists || '2 дорослих',
+        destination: data.destination || lead.destination || '',
+        departureOrigin: data.departureOrigin || lead.departureCity || '',
+        createdAt: new Date().toISOString(),
+        hotels: data.hotels || []
+      };
+
+      // Append new selection to preserved list
+      lead.selections.push(newSelectionItem);
+      lead.selectionHotels = newSelectionItem.hotels;
+      lead.selectionTourists = newSelectionItem.tourists;
+      lead.selectionDestination = newSelectionItem.destination;
+      lead.selectionUrl = `/p/${lead.id}?sel=${newSelectionItem.id}`;
       lead.hasSelection = true;
 
       // Save to server
       await apiCall('/api/leads/update', 'POST', {
         id: lead.id,
-        selection: lead.selectionHotels,
+        selections: lead.selections,
+        selection: newSelectionItem.hotels,
         selectionUrl: lead.selectionUrl,
-        tourists: lead.selectionTourists
+        tourists: newSelectionItem.tourists
       });
     }
 
