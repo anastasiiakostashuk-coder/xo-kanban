@@ -3091,13 +3091,18 @@ window.parseTourLinkForLead = async (leadId) => {
     }
 
     if (statusEl) {
-      statusEl.innerHTML = `✅ <strong>Успішно розпізнано ${data.hotelsCount} готелів!</strong> Склад: ${data.tourists || '2 дор.'}. Підбірка сформована.`;
+      statusEl.innerHTML = `✅ <strong>Успішно розпізнано ${data.hotelsCount} готелів!</strong> (Склад: ${data.tourists || '2 дор.'}, виліт: ${data.departureOrigin || 'Кишинів'}). Підбірка готова!`;
       statusEl.style.color = '#059669';
     }
 
-    setTimeout(() => {
-      render();
-    }, 800);
+    // Instantly update the lead drawer and the modal view
+    render();
+    // Re-focus or keep status visible
+    const newStatusEl = document.getElementById('tour-parse-status');
+    if (newStatusEl) {
+      newStatusEl.innerHTML = `✅ <strong>Успішно розпізнано ${data.hotelsCount} готелів!</strong> Створено: <strong>${escapeHtml(newSelectionItem.title)}</strong>.`;
+      newStatusEl.style.color = '#059669';
+    }
   } catch (err) {
     if (statusEl) {
       statusEl.innerHTML = `❌ Помилка парсингу: ${err.message}`;
