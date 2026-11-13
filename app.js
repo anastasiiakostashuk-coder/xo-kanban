@@ -660,15 +660,14 @@ function renderCard(lead) {
       <!-- Кнопка створення / переходу до підбірки туриста (в 1 клік) -->
       ${['new_request', 'clarifying', 'in_progress', 'waiting_decision', 'combination', 'booked'].includes(lead.stage) ? `
         <div style="margin-top:5px;" onclick="event.stopPropagation()">
-          <a
-            href="/selection-preview.html?leadId=${lead.id}&client=${encodeURIComponent(lead.clientName)}&dest=${encodeURIComponent(lead.destination||'')}&city=${encodeURIComponent(lead.departureCity||'')}"
-            target="_blank"
-            rel="noopener"
-            style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:5px 8px;font-size:11px;font-weight:800;background:linear-gradient(135deg, #059669 0%, #047857 100%);color:#ffffff;border-radius:6px;text-decoration:none;box-shadow:0 2px 6px rgba(5,150,105,0.25);transition:all 0.15s ease;"
-            title="Створити та надіслати підбірку турів туристу"
+          <button
+            type="button"
+            onclick="window.openSelectionModalForLead('${lead.id}')"
+            style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:5px 8px;font-size:11px;font-weight:800;background:linear-gradient(135deg, #059669 0%, #047857 100%);color:#ffffff;border:none;border-radius:6px;cursor:pointer;box-shadow:0 2px 6px rgba(5,150,105,0.25);transition:all 0.15s ease;"
+            title="Вставити посилання Турсканера та сформувати підбірку"
           >
-            🌴 Створити підбірку ↗
-          </a>
+            🌴 ${lead.selectionHotels && lead.selectionHotels.length ? '🌴 Добірка (' + lead.selectionHotels.length + ' гот.) ⚙️' : '🌴 Створити підбірку (вставити Tourscanner)'}
+          </button>
         </div>
       ` : ''}
 
@@ -2944,6 +2943,215 @@ window.submitNewLead = async () => {
   });
 };
 
+
+// --- Інтерактивний Конструктор Підбірок (Парсинг Tourscanner / tour.link) ---
+window.openSelectionModalForLead = (leadId) => {
+  const lead = state.leads.find(l => l.id === leadId);
+  if (!lead) return;
+  state.activeSelectionLeadId = leadId;
+  state.selectionModalOpen = true;
+  render();
+};
+
+window.closeSelectionModal = () => {
+  state.selectionModalOpen = false;
+  state.activeSelectionLeadId = null;
+  render();
+};
+
+window.parseTourLinkForLead = async (leadId) => {
+  const input = document.getElementById('tour-scanner-url-input');
+  const statusEl = document.getElementById('tour-parse-status');
+  const btn = document.getElementById('tour-parse-btn');
+  const url = (input?.value || '').trim();
+
+  if (!url) {
+    alert('Будь ласка, вставте посилання з Турсканера (наприклад, https://tour.link/...)');
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.innerHTML = '⏳ <strong>Розпізнаємо тур з Турсканера...</strong> Витягуємо назви готелів, фото, харчування, ціни та рейси...';
+    statusEl.style.color = '#0284c7';
+  }
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/selection/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Не вдалося розпізнати посилання');
+    }
+
+    const lead = state.leads.find(l => l.id === leadId);
+    if (lead) {
+      lead.selectionHotels = data.hotels || [];
+      lead.selectionTourists = data.tourists || lead.tourists || '2 дорослих';
+      lead.selectionDestination = data.destination || lead.destination || '';
+      lead.selectionOrigin = data.departureOrigin || lead.departureCity || '';
+      lead.selectionUrl = `/p/${lead.id}`;
+      lead.hasSelection = true;
+
+      // Save to server
+      await apiCall('/api/leads/update', 'POST', {
+        id: lead.id,
+        selection: lead.selectionHotels,
+        selectionUrl: lead.selectionUrl,
+        tourists: lead.selectionTourists
+      });
+    }
+
+    if (statusEl) {
+      statusEl.innerHTML = `✅ <strong>Успішно розпізнано ${data.hotelsCount} готелів!</strong> Склад: ${data.tourists || '2 дор.'}. Підбірка сформована.`;
+      statusEl.style.color = '#059669';
+    }
+
+    setTimeout(() => {
+      render();
+    }, 800);
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerHTML = `❌ Помилка парсингу: ${err.message}`;
+      statusEl.style.color = '#dc2626';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+function renderSelectionModal() {
+  if (!state.selectionModalOpen || !state.activeSelectionLeadId) return '';
+  const lead = state.leads.find(l => l.id === state.activeSelectionLeadId);
+  if (!lead) return '';
+
+  const hotels = lead.selectionHotels || [];
+  const publicSelectionLink = window.location.origin + `/p/${lead.id}`;
+
+  return `
+    <div class="modal-backdrop" onclick="window.closeSelectionModal()">
+      <div class="carousel-modal" style="max-width:760px;width:95%;max-height:90vh;overflow-y:auto;" onclick="event.stopPropagation()">
+        
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid #e2e8f0;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;font-size:20px;">
+              🌴
+            </div>
+            <div>
+              <h2 style="font-size:18px;font-weight:900;color:#0f172a;margin:0;">
+                Конструктор підбірки для: ${escapeHtml(lead.clientName)}
+              </h2>
+              <div style="font-size:12px;color:#64748b;margin-top:2px;">
+                #${lead.shortId} · ${escapeHtml(lead.destination || 'Будь-куди')} · ${escapeHtml(lead.departureCity || 'Виліт не вказано')}
+              </div>
+            </div>
+          </div>
+          <button class="xo-btn" onclick="window.closeSelectionModal()">✕</button>
+        </div>
+
+        <!-- Поле вставки посилання Турсканера -->
+        <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:14px;padding:16px;margin-bottom:20px;box-shadow:0 4px 14px rgba(16,185,129,0.08);">
+          <label style="font-weight:800;font-size:13px;color:#166534;display:block;margin-bottom:6px;">
+            🔗 Вставте посилання з Турсканера (tour.link або агрегатора):
+          </label>
+          <p style="font-size:11.5px;color:#15803d;line-height:1.45;margin:0 0 10px;">
+            Вставте посилання, яке ви зібрали в Турсканері. Наш парсер автоматично розпізнає назви готелів, зірки, HD-фотографії, типи номерів, харчування, ціни та точний розклад вильотів.
+          </p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input
+              type="url"
+              id="tour-scanner-url-input"
+              class="comment-input"
+              style="flex:1;min-width:260px;padding:10px 14px;font-size:13.5px;border:1px solid #86efac;border-radius:10px;background:#fff;"
+              placeholder="https://tour.link/gst1rk або посилання з турами..."
+              onkeydown="if(event.key==='Enter') window.parseTourLinkForLead('${lead.id}')"
+            />
+            <button
+              type="button"
+              id="tour-parse-btn"
+              class="xo-btn xo-btn-lime"
+              style="background:#059669;color:#fff;border:none;padding:10px 20px;font-weight:800;border-radius:10px;cursor:pointer;white-space:nowrap;"
+              onclick="window.parseTourLinkForLead('${lead.id}')"
+            >
+              ⚡ Розпізнати тур
+            </button>
+          </div>
+          <div id="tour-parse-status" style="font-size:12px;margin-top:8px;"></div>
+        </div>
+
+        <!-- Список розпізнаних готелів у підбірці -->
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-size:15px;font-weight:800;color:#0f172a;margin:0;">
+              🏨 Готелі в підбірці (${hotels.length}):
+            </h3>
+            ${hotels.length > 0 ? `
+              <div style="display:flex;gap:8px;">
+                <a
+                  href="${publicSelectionLink}"
+                  target="_blank"
+                  rel="noopener"
+                  class="xo-btn"
+                  style="background:#0284c7;color:#fff;text-decoration:none;font-size:12px;font-weight:800;padding:6px 12px;border-radius:8px;"
+                >
+                  👁️ Відкрити перегляд клієнта ↗
+                </a>
+                <button
+                  type="button"
+                  class="xo-btn xo-btn-lime"
+                  style="font-size:12px;font-weight:800;padding:6px 12px;border-radius:8px;"
+                  onclick="navigator.clipboard.writeText('${publicSelectionLink}');alert('✅ Посилання на добірку скопійовано: ' + '${publicSelectionLink}');"
+                >
+                  📋 Скопіювати посилання
+                </button>
+              </div>
+            ` : ''}
+          </div>
+
+          ${hotels.length === 0 ? `
+            <div style="text-align:center;padding:30px 16px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;">
+              <span style="font-size:28px;display:block;margin-bottom:6px;">📭</span>
+              <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:4px;">Підбірка ще не сформована</div>
+              <div style="font-size:11.5px;">Вставте посилання на Турсканер вище і натисніть «⚡ Розпізнати тур»</div>
+            </div>
+          ` : `
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              ${hotels.map((h, idx) => `
+                <div style="display:flex;gap:12px;background:#ffffff;border:1px solid #e2e8f0;padding:12px;border-radius:12px;align-items:center;">
+                  ${h.photo ? `<img src="${escapeHtml(h.photo)}" alt="${escapeHtml(h.name)}" style="width:80px;height:65px;object-fit:cover;border-radius:8px;" />` : ''}
+                  <div style="flex:1;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <span style="font-weight:800;font-size:14px;color:#0f172a;">${escapeHtml(h.name)}</span>
+                      <span style="color:#eab308;font-size:12px;">${'★'.repeat(h.stars || 5)}</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748b;margin:2px 0;">
+                      📍 ${escapeHtml(h.resort || '')} · 🍽️ ${escapeHtml(h.meal || 'All Inclusive')} · 🛏️ ${escapeHtml(h.room || 'Standard')}
+                    </div>
+                    <div style="font-size:12px;font-weight:800;color:#059669;">
+                      ${(h.options && h.options[0]) ? `💰 ${h.options[0].price} ${h.options[0].currency} (${h.options[0].dates || ''})` : ''}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid #e2e8f0;">
+          <button type="button" class="xo-btn" onclick="window.closeSelectionModal()">
+            Закрити
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
 function render() {
   const root = document.getElementById('crm-root');
   if (!root) return;
@@ -2968,6 +3176,7 @@ function render() {
     ${renderLostReasonModal()}
     ${renderPostponedModal()}
     ${renderNewLeadModal()}
+    ${renderSelectionModal()}
   `;
 
   // Restore scroll positions immediately so Kanban/List/Drawer never jumps
